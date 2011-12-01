@@ -97,6 +97,8 @@ struct gl_priv {
     MPGLContext *glctx;
     GL *gl;
 
+    int gl_debug;
+
     struct vertex_array va_osd, va_eosd, va_video;
 
     //! Textures for OSD
@@ -128,7 +130,6 @@ struct gl_priv {
     uint32_t image_format;
     uint32_t image_d_width;
     uint32_t image_d_height;
-    int many_fmts;
     int force_pbo;
     int use_glFinish;
     int swap_interval;
@@ -382,7 +383,6 @@ static void update_uniforms(struct vo *vo, GLuint program)
             gl->PixelStorei(GL_UNPACK_ROW_LENGTH, 0);
             gl->TexImage1D(GL_TEXTURE_1D, 0, GL_RGBA16F, LOOKUP_TEXTURE_SIZE, 0,
                            GL_RGBA, GL_FLOAT, tex);
-            gl->TexParameterf(GL_TEXTURE_1D, GL_TEXTURE_PRIORITY, 1.0);
             gl->TexParameteri(GL_TEXTURE_1D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
             gl->TexParameteri(GL_TEXTURE_1D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
             gl->TexParameteri(GL_TEXTURE_1D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
@@ -405,7 +405,6 @@ static void update_uniforms(struct vo *vo, GLuint program)
             // 6 coefficients stored in 2 pixels (at x=0 and x=1)
             gl->TexImage2D(GL_TEXTURE_2D, 0, GL_RGBA16F, 2, LOOKUP_TEXTURE_SIZE,
                            0, GL_RGB, GL_FLOAT, tex);
-            gl->TexParameterf(GL_TEXTURE_2D, GL_TEXTURE_PRIORITY, 1.0);
             gl->TexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
             gl->TexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
             gl->TexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
@@ -521,7 +520,7 @@ static void genEOSD(struct vo *vo, mp_eosd_images_t *imgs)
         texSize(vo, p->eosd->surface.w, p->eosd->surface.h,
                 &p->eosd_texture_width, &p->eosd_texture_height);
         // xxx it doesn't need to be cleared, that's a waste of time
-        glCreateClearTex(gl, GL_TEXTURE_2D, GL_ALPHA, GL_ALPHA,
+        glCreateClearTex(gl, GL_TEXTURE_2D, GL_RED, GL_RED,
                          GL_UNSIGNED_BYTE, GL_NEAREST,
                          p->eosd_texture_width, p->eosd_texture_height, 0);
     }
@@ -537,7 +536,7 @@ static void genEOSD(struct vo *vo, mp_eosd_images_t *imgs)
         struct eosd_target *target = &p->eosd->targets[n];
         ASS_Image *i = target->ass_img;
 
-        glUploadTex(gl, GL_TEXTURE_2D, GL_ALPHA, GL_UNSIGNED_BYTE, i->bitmap,
+        glUploadTex(gl, GL_TEXTURE_2D, GL_RED, GL_UNSIGNED_BYTE, i->bitmap,
                     i->stride, target->source.x0, target->source.y0,
                     i->w, i->h, 0);
 
@@ -580,6 +579,9 @@ static void uninitGl(struct vo *vo)
 {
     struct gl_priv *p = vo->priv;
     GL *gl = p->gl;
+
+    if (!gl || !gl->DeleteTextures)
+        return;
 
     gl->DeleteProgram(p->va_osd.program);
     gl->DeleteProgram(p->va_eosd.program);
@@ -720,9 +722,9 @@ static void link_shader(GL *gl, GLuint program)
 {
     gl->LinkProgram(program);
     GLint status;
-    gl->GetProgramiv_new(program, GL_LINK_STATUS, &status);
+    gl->GetProgramiv(program, GL_LINK_STATUS, &status);
     GLint log_length;
-    gl->GetProgramiv_new(program, GL_INFO_LOG_LENGTH, &log_length);
+    gl->GetProgramiv(program, GL_INFO_LOG_LENGTH, &log_length);
 
     if (!status || log_length > 1) {
         GLchar *log = talloc_zero_size(NULL, log_length + 1);
@@ -834,6 +836,8 @@ static int initGl(struct vo *vo, uint32_t d_width, uint32_t d_height)
     gl->Disable(GL_CULL_FACE);
     gl->DrawBuffer(vo_doublebuffering ? GL_BACK : GL_FRONT);
 
+    glCheckError(gl, "before video texture creation");
+
     mp_msg(MSGT_VO, MSGL_V, "[gl] Creating %dx%d texture...\n",
            p->texture_width, p->texture_height);
 
@@ -845,7 +849,6 @@ static int initGl(struct vo *vo, uint32_t d_width, uint32_t d_height)
         gl->BindTexture(GL_TEXTURE_2D, plane->gl_texture);
 
         GLint scale_type = get_scale_type(vo, plane->is_chroma);
-
         glCreateClearTex(gl, GL_TEXTURE_2D, p->gl_internal_format, p->gl_format,
                          p->gl_type, scale_type,
                          p->texture_width >> plane->shift_x,
@@ -856,6 +859,8 @@ static int initGl(struct vo *vo, uint32_t d_width, uint32_t d_height)
             gl->TexParameteri(GL_TEXTURE_2D, GL_GENERATE_MIPMAP, GL_TRUE);
     }
     gl->ActiveTexture(GL_TEXTURE0);
+
+    glCheckError(gl, "after video texture creation");
 
     GLint max_texture_size;
     gl->GetIntegerv(GL_MAX_TEXTURE_SIZE, &max_texture_size);
@@ -881,7 +886,13 @@ static int create_window(struct vo *vo, uint32_t d_width, uint32_t d_height,
     if (p->stereo_mode == GL_3D_QUADBUFFER)
         flags |= VOFLAG_STEREO;
 
-    return p->glctx->create_window(p->glctx, d_width, d_height, flags, title);
+    int mpgl_version = MPGL_VER(3, 1);
+    int mpgl_flags = 0;
+    if (p->gl_debug)
+        mpgl_flags |= MPGLFLAG_DEBUG;
+
+    return create_mpglcontext(p->glctx, mpgl_flags, mpgl_version, d_width,
+                              d_height, flags, title);
 }
 
 static int config(struct vo *vo, uint32_t width, uint32_t height,
@@ -899,6 +910,14 @@ static int config(struct vo *vo, uint32_t width, uint32_t height,
     p->is_yuv = mp_get_chroma_shift(p->image_format, &xs, &ys, &depth) > 0;
     glFindFormat(format, true, NULL, &p->gl_internal_format,
                  &p->gl_format, &p->gl_type);
+
+    // fix for legacy crap from gl_common.c
+    if (p->gl_internal_format == 1) p->gl_internal_format = GL_RED;
+    if (p->gl_internal_format == 2) p->gl_internal_format = GL_RG;
+    if (p->gl_internal_format == 3) p->gl_internal_format = GL_RGB;
+    if (p->gl_internal_format == 4) p->gl_internal_format = GL_RGBA;
+    if (p->gl_format == GL_LUMINANCE)
+        p->gl_format = GL_RED;
 
     if (!p->is_yuv) {
         // xxx mp_image_setfmt calculates this as well
@@ -921,12 +940,10 @@ static int config(struct vo *vo, uint32_t width, uint32_t height,
 
     p->vo_flipped = !!(flags & VOFLAG_FLIPPING);
 
-    if (create_window(vo, d_width, d_height, flags, title) < 0)
-        return -1;
-
     if (vo->config_count)
         uninitGl(vo);
-    if (p->glctx->setGlWindow(p->glctx) == SET_WINDOW_FAILED)
+
+    if (create_window(vo, d_width, d_height, flags, title) == SET_WINDOW_FAILED)
         return -1;
     glCheckError(p->gl, "before initGl");
     initGl(vo, vo->dwidth, vo->dheight);
@@ -979,8 +996,8 @@ static void create_osd_texture(void *ctx, int x0, int y0, int w, int h,
 
     gl->GenTextures(1, &p->osdtex[p->osdtexCnt]);
     gl->BindTexture(GL_TEXTURE_2D, p->osdtex[p->osdtexCnt]);
-    glCreateClearTex(gl, GL_TEXTURE_2D, GL_LUMINANCE_ALPHA, GL_LUMINANCE_ALPHA,
-                     GL_UNSIGNED_BYTE, scale_type, sx, sy, 0);
+    glCreateClearTex(gl, GL_TEXTURE_2D, GL_RG, GL_RG, GL_UNSIGNED_BYTE,
+                     scale_type, sx, sy, 0);
     {
         int i;
         unsigned char *tmp = malloc(stride * h * 2);
@@ -989,8 +1006,8 @@ static void create_osd_texture(void *ctx, int x0, int y0, int w, int h,
             tmp[i*2+0] = src[i];
             tmp[i*2+1] = -srca[i];
         }
-        glUploadTex(gl, GL_TEXTURE_2D, GL_LUMINANCE_ALPHA, GL_UNSIGNED_BYTE,
-                    tmp, stride * 2, 0, 0, w, h, 0);
+        glUploadTex(gl, GL_TEXTURE_2D, GL_RG, GL_UNSIGNED_BYTE, tmp, stride * 2,
+                    0, 0, w, h, 0);
         free(tmp);
     }
 
@@ -1312,8 +1329,7 @@ static int query_format(struct vo *vo, uint32_t format)
         return caps;
     if (!p->use_ycbcr && (format == IMGFMT_UYVY || format == IMGFMT_YVYU))
         return 0;
-    if (p->many_fmts &&
-        glFindFormat(format, true, NULL, NULL, NULL, NULL))
+    if (glFindFormat(format, true, NULL, NULL, NULL, NULL))
         return caps;
     return 0;
 }
@@ -1336,7 +1352,6 @@ static int preinit_internal(struct vo *vo, const char *arg, int allow_sw,
     vo->priv = p;
 
     *p = (struct gl_priv) {
-        .many_fmts = 1,
         .colorspace = MP_CSP_DETAILS_DEFAULTS,
         .filter_strength = 0.5,
         .use_rectangle = -1,
@@ -1355,7 +1370,6 @@ static int preinit_internal(struct vo *vo, const char *arg, int allow_sw,
 
     const opt_t subopts[] = {
         {"gamma",        OPT_ARG_BOOL, &p->use_gamma,    NULL},
-        {"manyfmts",     OPT_ARG_BOOL, &p->many_fmts,    NULL},
         {"ycbcr",        OPT_ARG_BOOL, &p->use_ycbcr,    NULL},
         {"rectangle",    OPT_ARG_INT,  &p->use_rectangle,int_non_neg},
         {"filter-strength", OPT_ARG_FLOAT, &p->filter_strength, NULL},
@@ -1365,6 +1379,7 @@ static int preinit_internal(struct vo *vo, const char *arg, int allow_sw,
         {"mipmapgen",    OPT_ARG_BOOL, &p->mipmap_gen,   NULL},
         {"osdcolor",     OPT_ARG_INT,  &p->osd_color,    NULL},
         {"stereo",       OPT_ARG_INT,  &p->stereo_mode,  NULL},
+        {"debug",        OPT_ARG_BOOL, &p->gl_debug,     NULL},
         // Legacy.
         {"yuv",          OPT_ARG_INT,  &yuv,             int_non_neg},
         {"lscale",       OPT_ARG_INT,  &p->lscale,       int_non_neg},
@@ -1384,8 +1399,6 @@ static int preinit_internal(struct vo *vo, const char *arg, int allow_sw,
                "\nOptions:\n"
                "  gamma\n"
                "    Enable gamma control.\n"
-               "  nomanyfmts\n"
-               "    Disable extended color formats for OpenGL 1.2 and later\n"
                "  rectangle=<0,1,2>\n"
                "    0: use power-of-two textures\n"
                "    1 and 2: use texture_non_power_of_two\n"
@@ -1448,10 +1461,8 @@ static int preinit_internal(struct vo *vo, const char *arg, int allow_sw,
         goto err_out;
     p->gl = p->glctx->gl;
 
-    if (!allow_sw) {
-        if (create_window(vo, 320, 200, VOFLAG_HIDDEN, NULL) < 0)
-            goto err_out;
-        if (p->glctx->setGlWindow(p->glctx) == SET_WINDOW_FAILED)
+    if (true) {
+        if (create_window(vo, 320, 200, VOFLAG_HIDDEN, NULL) == SET_WINDOW_FAILED)
             goto err_out;
         if (!allow_sw && isSoftwareGl(vo))
             goto err_out;
@@ -1465,9 +1476,6 @@ static int preinit_internal(struct vo *vo, const char *arg, int allow_sw,
             goto err_out;
         p->gl = p->glctx->gl;
     }
-    if (p->many_fmts)
-        mp_msg(MSGT_VO, MSGL_INFO, "[gl] using extended formats. "
-               "Use -vo gl:nomanyfmts if playback fails.\n");
 
     return 0;
 
