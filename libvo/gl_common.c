@@ -1696,8 +1696,19 @@ static int create_window_cocoa(struct MPGLContext *ctx, uint32_t d_width,
                                uint32_t d_height, uint32_t flags,
                                const char *title)
 {
-    return vo_cocoa_create_window(ctx, d_width, d_height, flags, title);
+    return vo_cocoa_create_window(ctx, d_width, d_height, flags, 0, title);
 }
+
+static int create_window_cocoa_gl3(struct MPGLContext *ctx, int gl_flags,
+                                 int gl_version, uint32_t d_width,
+                                 uint32_t d_height, uint32_t flags,
+                                 const char *title)
+{
+    int rv = vo_cocoa_create_window(ctx, d_width, d_height, flags, 1, title);
+    getFunctions(ctx->gl, (void *)getdladdr, NULL, false);
+    return rv;
+}
+
 static int setGlWindow_cocoa(MPGLContext *ctx)
 {
     vo_cocoa_change_attributes(ctx);
@@ -2258,6 +2269,7 @@ MPGLContext *init_mpglcontext(enum MPGLType type, struct vo *vo)
     case GLTYPE_COCOA:
         ctx->create_window = create_window_cocoa;
         ctx->setGlWindow = setGlWindow_cocoa;
+        ctx->create_window_gl3 = create_window_cocoa_gl3;
         ctx->releaseGlContext = releaseGlContext_cocoa;
         ctx->swapGlBuffers = swapGlBuffers_cocoa;
         ctx->check_events = cocoa_check_events;
