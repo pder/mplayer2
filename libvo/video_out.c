@@ -95,6 +95,7 @@ extern struct vo_driver video_out_null;
 extern struct vo_driver video_out_bl;
 extern struct vo_driver video_out_fbdev;
 extern struct vo_driver video_out_fbdev2;
+extern struct vo_driver video_out_omapfb;
 extern struct vo_driver video_out_svga;
 extern struct vo_driver video_out_png;
 extern struct vo_driver video_out_ggi;
@@ -193,6 +194,7 @@ const struct vo_driver *video_out_drivers[] =
 #ifdef CONFIG_FBDEV
         &video_out_fbdev,
         &video_out_fbdev2,
+        &video_out_omapfb,
 #endif
 #ifdef CONFIG_SVGALIB
         &video_out_svga,
