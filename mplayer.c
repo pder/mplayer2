@@ -2832,8 +2832,6 @@ static double update_video_nocorrect_pts(struct MPContext *mpctx)
             break;
         unsigned char *packet = NULL;
         frame_time = sh_video->next_frame_time;
-        if (mpctx->restart_playback)
-            frame_time = 0;
         int in_size = video_read_frame(sh_video, &sh_video->next_frame_time,
                                        &packet, force_fps);
         if (in_size < 0) {
