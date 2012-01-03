@@ -98,6 +98,7 @@ static struct fb_fix_screeninfo finfo;
 static struct omapfb_mem_info minfo, minfo_old;
 static struct omapfb_plane_info pinfo;
 static int xoff, yoff;
+static int orig_width, orig_height;
 
 static struct {
     unsigned x;
@@ -196,12 +197,14 @@ static void x11_check_events(void)
 {
     int e = vo_x11_check_events(mDisplay);
 
-    if (e & VO_EVENT_RESIZE)
-        vo_calc_drwXY(&drwX, &drwY);
-
-    if (e & VO_EVENT_EXPOSE || e & VO_EVENT_RESIZE)
+    if (e & VO_EVENT_RESIZE) 
     {
-        vo_xv_draw_colorkey(drwX, drwY, vo_dwidth - 1, vo_dheight - 1);
+        vo_calc_drwXY(&drwX, &drwY);
+        vo_x11_clearwindow(mDisplay, vo_window);
+    }
+    if (e & VO_EVENT_EXPOSE || e & VO_EVENT_RESIZE || e & VO_EVENT_MOVE)
+    {
+        vo_xv_draw_colorkey(drwX, drwY, vo_dwidth, vo_dheight);
         omapfb_update(0, 0, 0, 0, 1);
     }
 }
@@ -273,8 +276,8 @@ static void omapfb_update(int x, int y, int out_w, int out_h, int show)
         return;
     }
 
-    xres = sinfo.xres;
-    yres = sinfo.yres;
+    xres = orig_width;
+    yres = orig_height;
 
     /* Handle clipping: if the left or top edge of the window goes
      * offscreen, clamp the overlay to the left or top edge of the
@@ -350,10 +353,18 @@ static void omapfb_update(int x, int y, int out_w, int out_h, int show)
         xres--;
 
     pinfo.enabled = show;
-    pinfo.pos_x = x;
-    pinfo.pos_y = y;
-    pinfo.out_width  = out_w;
-    pinfo.out_height = out_h;
+
+    if (vo_fs) {
+        pinfo.pos_x = drwX;
+        pinfo.pos_y = drwY;
+        pinfo.out_width  = out_w - (2 * drwX);
+        pinfo.out_height = out_h - (2 * drwY);
+    } else {
+        pinfo.pos_x = x;
+        pinfo.pos_y = y;
+        pinfo.out_width  = out_w;
+        pinfo.out_height = out_h;
+    }
 
     sinfo.xoffset = fb_pages[page].x + xoff;
     sinfo.yoffset = fb_pages[page].y + yoff;
@@ -440,11 +451,11 @@ static int config(uint32_t width, uint32_t height, uint32_t d_width,
         }
 
         vo_calc_drwXY(&drwX, &drwY);
-        vo_xv_draw_colorkey(drwX, drwY, vo_dwidth - 1, vo_dheight - 1);
+        vo_xv_draw_colorkey(drwX, drwY, vo_dwidth, vo_dheight);
     }
 
-    sinfo.xres = width & ~15;
-    sinfo.yres = height & ~15;
+    orig_width = sinfo.xres = width & ~15;
+    orig_height = sinfo.yres = height & ~15;
     sinfo.xres_virtual = sinfo.xres;
     sinfo.yres_virtual = sinfo.yres + 16;
     sinfo.xoffset = 0;
