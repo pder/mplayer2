@@ -73,7 +73,6 @@ It's an interpolation bug in the color conversion that needs to be fixed
 #include <X11/Xlib.h>
 #include <X11/Xutil.h>
 #include <X11/Xatom.h>
-#include "wskeys.h"
 
 static vo_info_t info = {
 	"omapfb video driver",
