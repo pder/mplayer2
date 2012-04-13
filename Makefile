@@ -99,7 +99,7 @@ SRCS_COMMON-$(LIBTHEORA)             += libmpcodecs/vd_theora.c
 SRCS_COMMON-$(LIVE555)               += libmpdemux/demux_rtp.cpp \
                                         libmpdemux/demux_rtp_codec.cpp \
                                         stream/stream_live555.c
-SRCS_COMMON-$(MACOSX_FINDER)         += osdep/macosx_finder_args.c
+SRCS_COMMON-$(MACOSX_FINDER)         += osdep/macosx_finder_args.m
 SRCS_COMMON-$(MNG)                   += libmpdemux/demux_mng.c
 SRCS_COMMON-$(MPG123)                += libmpcodecs/ad_mpg123.c
 
@@ -115,7 +115,6 @@ SRCS_COMMON-$(NATIVE_RTSP)           += stream/stream_rtsp.c \
 
 SRCS_COMMON-$(NEED_GETTIMEOFDAY)     += osdep/gettimeofday.c
 SRCS_COMMON-$(NEED_GLOB)             += osdep/glob-win.c
-SRCS_COMMON-$(NEED_MMAP)             += osdep/mmap-os2.c
 SRCS_COMMON-$(NEED_SETENV)           += osdep/setenv.c
 SRCS_COMMON-$(NEED_SHMEM)            += osdep/shmem.c
 SRCS_COMMON-$(NEED_STRSEP)           += osdep/strsep.c
@@ -414,12 +413,12 @@ SRCS_COMMON = asxparser.c \
               stream/stream_null.c \
               stream/url.c \
               sub/av_sub.c \
-              sub/sub.c \
-              sub/sub_cc.c \
               sub/dec_sub.c \
               sub/find_sub.c \
               sub/find_subfiles.c \
               sub/spudec.c \
+              sub/sub.c \
+              sub/sub_cc.c \
               sub/subassconvert.c \
               sub/subreader.c \
               sub/vobsub.c \
@@ -438,7 +437,6 @@ SRCS_MPLAYER-$(BL)           += libvo/vo_bl.c
 SRCS_MPLAYER-$(CACA)         += libvo/vo_caca.c
 SRCS_MPLAYER-$(COREAUDIO)    += libao2/ao_coreaudio.c
 SRCS_MPLAYER-$(COREVIDEO)    += libvo/vo_corevideo.m libvo/osx_common.c
-SRCS_MPLAYER-$(DART)         += libao2/ao_dart.c
 SRCS_MPLAYER-$(DGA)          += libvo/vo_dga.c
 SRCS_MPLAYER-$(DIRECT3D)     += libvo/vo_direct3d.c libvo/w32_common.c
 SRCS_MPLAYER-$(DIRECTFB)     += libvo/vo_directfb2.c libvo/vo_dfbmga.c
@@ -459,8 +457,6 @@ SRCS_MPLAYER-$(IVTV)         += libao2/ao_ivtv.c libvo/vo_ivtv.c
 SRCS_MPLAYER-$(JACK)         += libao2/ao_jack.c
 SRCS_MPLAYER-$(JOYSTICK)     += input/joystick.c
 SRCS_MPLAYER-$(JPEG)         += libvo/vo_jpeg.c
-SRCS_MPLAYER-$(KAI)          += libao2/ao_kai.c
-SRCS_MPLAYER-$(KVA)          += libvo/vo_kva.c
 SRCS_MPLAYER-$(LIRC)          += input/lirc.c
 SRCS_MPLAYER-$(MD5SUM)        += libvo/vo_md5sum.c
 SRCS_MPLAYER-$(MGA)           += libvo/vo_mga.c
@@ -469,7 +465,6 @@ SRCS_MPLAYER-$(OPENAL)        += libao2/ao_openal.c
 SRCS_MPLAYER-$(OSS)           += libao2/ao_oss.c
 SRCS_MPLAYER-$(PNM)           += libvo/vo_pnm.c
 SRCS_MPLAYER-$(PULSE)         += libao2/ao_pulse.c
-SRCS_MPLAYER-$(QUARTZ)        += libvo/vo_quartz.c libvo/osx_common.c
 SRCS_MPLAYER-$(RSOUND)        += libao2/ao_rsound.c
 SRCS_MPLAYER-$(S3FB)          += libvo/vo_s3fb.c
 SRCS_MPLAYER-$(SDL)           += libao2/ao_sdl.c libvo/vo_sdl.c libvo/sdl_common.c
@@ -524,7 +519,7 @@ OBJS_MPLAYER-$(PE_EXECUTABLE) += osdep/mplayer-rc.o
 OBJS_MPLAYER   += $(OBJS_MPLAYER-yes)
 
 MPLAYER_DEPS  = $(OBJS_MPLAYER)  $(OBJS_COMMON) $(COMMON_LIBS)
-DEP_FILES = $(patsubst %.S,%.d,$(patsubst %.cpp,%.d,$(patsubst %.c,%.d,$(SRCS_COMMON) $(SRCS_MPLAYER:.m=.d))))
+DEP_FILES = $(patsubst %.S,%.d,$(patsubst %.cpp,%.d,$(patsubst %.c,%.d,$(SRCS_COMMON:.m=.d) $(SRCS_MPLAYER:.m=.d))))
 
 ALL_PRG-$(MPLAYER)  += mplayer$(EXESUF)
 

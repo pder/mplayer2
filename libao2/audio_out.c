@@ -136,10 +136,11 @@ void list_audio_out(void)
     mp_msg(MSGT_GLOBAL, MSGL_INFO,"\n");
 }
 
-struct ao *ao_create(void)
+struct ao *ao_create(struct MPOpts *opts, struct input_ctx *input)
 {
     struct ao *r = talloc(NULL, struct ao);
-    *r = (struct ao){.outburst = OUTBURST, .buffersize = -1};
+    *r = (struct ao){.outburst = OUTBURST, .buffersize = -1,
+                     .opts = opts, .input_ctx = input };
     return r;
 }
 
@@ -231,7 +232,7 @@ int ao_play(struct ao *ao, void *data, int len, int flags)
     return ao->driver->play(ao, data, len, flags);
 }
 
-int ao_control(struct ao *ao, int cmd, void *arg)
+int ao_control(struct ao *ao, enum aocontrol cmd, void *arg)
 {
     if (ao->driver->control)
         return ao->driver->control(ao, cmd, arg);
@@ -298,7 +299,7 @@ int old_ao_play(struct ao *ao, void *data, int len, int flags)
     return ao->driver->old_functions->play(data, len, flags);
 }
 
-int old_ao_control(struct ao *ao, int cmd, void *arg)
+int old_ao_control(struct ao *ao, enum aocontrol cmd, void *arg)
 {
     return ao->driver->old_functions->control(cmd, arg);
 }
