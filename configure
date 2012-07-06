@@ -6186,7 +6186,7 @@ if test "$_dvdnav" = yes ; then
     inputmodules="dvdnav(internal) $inputmodules"
   else
     extra_cflags="$extra_cflags $($_dvdnavconfig --cflags)"
-    extra_ldflags="$extra_ldflags $($_dvdnavconfig --minilibs)"
+    extra_ldflags="$extra_ldflags $($_dvdnavconfig --libs)"
     inputmodules="dvdnav $inputmodules"
   fi
 else
