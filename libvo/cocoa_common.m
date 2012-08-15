@@ -25,6 +25,8 @@
 
 #include "cocoa_common.h"
 
+#include "config.h"
+
 #include "options.h"
 #include "video_out.h"
 #include "aspect.h"
@@ -39,6 +41,14 @@
 
 #define NSLeftAlternateKeyMask (0x000020 | NSAlternateKeyMask)
 #define NSRightAlternateKeyMask (0x000040 | NSAlternateKeyMask)
+
+// add methods not available on OSX versions prior to 10.7
+#ifndef MAC_OS_X_VERSION_10_7
+@interface NSView (IntroducedInLion)
+- (NSRect)convertRectToBacking:(NSRect)aRect;
+- (void)setWantsBestResolutionOpenGLSurface:(BOOL)aBool;
+@end
+#endif
 
 @interface GLMPlayerWindow : NSWindow <NSWindowDelegate>
 - (BOOL) canBecomeKeyWindow;
@@ -114,6 +124,13 @@ struct vo_cocoa_state *vo_cocoa_init_state(void)
     return s;
 }
 
+static bool supports_hidpi(NSView *view)
+{
+    SEL hdpi_selector = @selector(setWantsBestResolutionOpenGLSurface:);
+    return is_osx_version_at_least(10, 7, 0) && view &&
+           [view respondsToSelector:hdpi_selector];
+}
+
 bool vo_cocoa_gui_running(void)
 {
     return !!s;
@@ -160,6 +177,13 @@ void vo_cocoa_uninit(struct vo *vo)
     s = nil;
 }
 
+static int current_screen_has_dock_or_menubar(void)
+{
+    NSRect f  = s->screen_frame;
+    NSRect vf = [s->screen_handle visibleFrame];
+    return f.size.height > vf.size.height || f.size.width > vf.size.width;
+}
+
 void update_screen_info(void)
 {
     s->screen_array = [NSScreen screens];
@@ -191,8 +215,17 @@ int vo_cocoa_change_attributes(struct vo *vo)
 
 void resize_window(struct vo *vo)
 {
-    vo->dwidth = [[s->window contentView] frame].size.width;
-    vo->dheight = [[s->window contentView] frame].size.height;
+    NSView *view = [s->window contentView];
+    NSRect frame;
+
+    if (supports_hidpi(view)) {
+        frame = [view convertRectToBacking: [view frame]];
+    } else {
+        frame = [view frame];
+    }
+
+    vo->dwidth  = frame.size.width;
+    vo->dheight = frame.size.height;
     [s->glContext update];
 }
 
@@ -230,9 +263,12 @@ int vo_cocoa_create_window(struct vo *vo, uint32_t d_width,
 
         GLMPlayerOpenGLView *glView = [[GLMPlayerOpenGLView alloc] initWithFrame:NSMakeRect(0, 0, 100, 100)];
 
+        // check for HiDPI support and enable it (available on 10.7 +)
+        if (supports_hidpi(glView))
+            [glView setWantsBestResolutionOpenGLSurface:YES];
+
         NSOpenGLPixelFormatAttribute attrs[] = {
             NSOpenGLPFADoubleBuffer, // double buffered
-            NSOpenGLPFADepthSize, (NSOpenGLPixelFormatAttribute)16, // 16 bit depth buffer
             (NSOpenGLPixelFormatAttribute)0
         };
 
@@ -337,7 +373,6 @@ int vo_cocoa_check_events(struct vo *vo)
         return 0;
     l_vo = vo;
     [NSApp sendEvent:event];
-    l_vo = nil;
 
     if (s->did_resize) {
         s->did_resize = NO;
@@ -379,27 +414,53 @@ void *vo_cocoa_cgl_pixel_format(void)
     return [s->pixelFormat CGLPixelFormatObj];
 }
 
+static NSMenuItem *new_menu_item(NSMenu *parent_menu, NSString *title,
+                                 SEL action, NSString *key_equivalent)
+{
+    NSMenuItem *new_item = [[NSMenuItem alloc]
+                                initWithTitle:title
+                                       action:action
+                                keyEquivalent:key_equivalent];
+    [parent_menu addItem:new_item];
+    return [new_item autorelease];
+}
+
+static NSMenuItem *new_main_menu_item(NSMenu *parent_menu, NSMenu *child_menu,
+                                      NSString *title)
+{
+    NSMenuItem *new_item = [[NSMenuItem alloc]
+                                initWithTitle:title
+                                       action:nil
+                                keyEquivalent:@""];
+    [new_item setSubmenu:child_menu];
+    [parent_menu addItem:new_item];
+    return [new_item autorelease];
+}
+
 void create_menu()
 {
-    NSMenu *menu;
-    NSMenuItem *menuItem;
+    NSAutoreleasePool *pool = [NSAutoreleasePool new];
+    NSMenu *main_menu, *m_menu, *w_menu;
+    NSMenuItem *app_menu_item;
 
-    menu = [[NSMenu new] autorelease];
-    menuItem = [[NSMenuItem new] autorelease];
-    [menu addItem: menuItem];
-    [NSApp setMainMenu: menu];
+    main_menu = [[NSMenu new] autorelease];
+    app_menu_item = [[NSMenuItem new] autorelease];
+    [main_menu addItem:app_menu_item];
+    [NSApp setMainMenu: main_menu];
 
-    menu = [[NSMenu alloc] initWithTitle:@"Movie"];
-    menuItem = [[NSMenuItem alloc] initWithTitle:@"Half Size" action:@selector(halfSize) keyEquivalent:@"0"]; [menu addItem:menuItem];
-    menuItem = [[NSMenuItem alloc] initWithTitle:@"Normal Size" action:@selector(normalSize) keyEquivalent:@"1"]; [menu addItem:menuItem];
-    menuItem = [[NSMenuItem alloc] initWithTitle:@"Double Size" action:@selector(doubleSize) keyEquivalent:@"2"]; [menu addItem:menuItem];
+    m_menu = [[[NSMenu alloc] initWithTitle:@"Movie"] autorelease];
+    new_menu_item(m_menu, @"Half Size", @selector(halfSize), @"0");
+    new_menu_item(m_menu, @"Normal Size", @selector(normalSize), @"1");
+    new_menu_item(m_menu, @"Double Size", @selector(doubleSize), @"2");
 
-    menuItem = [[NSMenuItem alloc] initWithTitle:@"Movie" action:nil keyEquivalent:@""];
-    [menuItem setSubmenu:menu];
-    [[NSApp mainMenu] addItem:menuItem];
+    new_main_menu_item(main_menu, m_menu, @"Movie");
 
-    [menu release];
-    [menuItem release];
+    w_menu = [[[NSMenu alloc] initWithTitle:@"Window"] autorelease];
+    new_menu_item(w_menu, @"Minimize", @selector(performMiniaturize:), @"m");
+    new_menu_item(w_menu, @"Zoom", @selector(performZoom:), @"z");
+
+    new_main_menu_item(main_menu, w_menu, @"Window");
+    [pool release];
 }
 
 @implementation GLMPlayerWindow
@@ -414,7 +475,8 @@ void create_menu()
 {
     if (!vo_fs) {
         update_screen_info();
-        [NSApp setPresentationOptions:NSApplicationPresentationHideDock|NSApplicationPresentationHideMenuBar];
+        if (current_screen_has_dock_or_menubar())
+            [NSApp setPresentationOptions:NSApplicationPresentationHideDock|NSApplicationPresentationHideMenuBar];
         s->windowed_frame = [self frame];
         [self setHasShadow:NO];
         [self setStyleMask:s->fullscreen_mask];
