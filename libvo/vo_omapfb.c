@@ -53,6 +53,9 @@ It's an interpolation bug in the color conversion that needs to be fixed
 #include <sys/ioctl.h>
 #include <linux/fb.h>
 
+#include <libavcodec/avcodec.h>
+#include <libavutil/common.h>
+
 #include "config.h"
 #include "video_out.h"
 #include "video_out_internal.h"
@@ -64,7 +67,6 @@ It's an interpolation bug in the color conversion that needs to be fixed
 
 #include "libswscale/swscale.h"
 #include "libmpcodecs/vf_scale.h"
-#include "libavcodec/avcodec.h"
 
 #include "aspect.h"
 
