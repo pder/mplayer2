@@ -399,6 +399,7 @@ Video output:
   --enable-x11             enable X11 video output [autodetect]
   --enable-xshape          enable XShape support [autodetect]
   --disable-xss            disable screensaver support via xss [autodetect]
+  --enable-fbdev           enable FBDev video output [autodetect]
   --enable-directfb        enable DirectFB video output [autodetect]
   --disable-tga            disable Targa video output [enable]
   --disable-pnm            disable PNM video output [enable]
@@ -547,6 +548,7 @@ _gif=auto
 _gl=auto
 _aa=auto
 _caca=auto
+_fbdev=auto
 _dvb=auto
 _v4l2=auto
 _iconv=auto
@@ -816,6 +818,8 @@ for ac_option do
   --disable-gl)         _gl=no          ;;
   --enable-caca)        _caca=yes       ;;
   --disable-caca)       _caca=no        ;;
+  --enable-fbdev)       _fbdev=yes      ;;
+  --disable-fbdev)      _fbdev=no       ;;
   --enable-dvb)         _dvb=yes        ;;
   --disable-dvb)        _dvb=no         ;;
   --enable-v4l2)        _v4l2=yes       ;;
@@ -3826,6 +3830,21 @@ fi
 echores "$_caca"
 
 
+echocheck "FBDev"
+if test "$_fbdev" = auto ; then
+  _fbdev=no
+  linux && _fbdev=yes
+fi
+if test "$_fbdev" = yes ; then
+  def_fbdev='#define CONFIG_FBDEV 1'
+  vomodules="fbdev $vomodules"
+else
+  def_fbdev='#undef CONFIG_FBDEV'
+  novomodules="fbdev $novomodules"
+fi
+echores "$_fbdev"
+
+
 echocheck "DVB"
 if test "$_dvb" = auto ; then
   _dvb=no
@@ -5665,6 +5684,7 @@ DVDREAD_INTERNAL = $_dvdread_internal
 DXR3 = $_dxr3
 FAAD = $_faad
 FASTMEMCPY = $_fastmemcpy
+FBDEV = $_fbdev
 FTP = $_ftp
 GIF = $_gif
 GL = $_gl
@@ -6013,6 +6033,7 @@ $def_direct3d
 $def_directfb
 $def_directx
 $def_dvbin
+$def_fbdev
 $def_gif
 $def_gif_4
 $def_gif_tvt_hack
