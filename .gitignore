@@ -7,6 +7,7 @@
 /config.mak
 /config.log
 /mplayer
+/mplayer2.app
 /version.h
 /codecs.conf.h
 /codec-cfg
@@ -15,6 +16,10 @@
 /TAGS
 /locale
 /po
+/DOCS/man/*/mplayer.1
+/input/input.conf.h
 /libmpdemux/ebml_defs.c
 /libmpdemux/ebml_types.h
 /libvo/vdpau_template.c
+/libvo/vo_gl3_shaders.h
+/sub/osd_font.h

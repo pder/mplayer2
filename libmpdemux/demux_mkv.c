@@ -50,8 +50,6 @@
 
 #include "mp_msg.h"
 
-#include "sub/sub.h"
-
 
 #ifdef CONFIG_QTX_CODECS
 #include "loader/qtx/qtxsdk/components.h"
@@ -885,6 +883,7 @@ static int demux_mkv_read_tags(demuxer_t *demuxer)
             demux_info_add_bstr(demuxer, tag.simple_tag[j].tag_name, tag.simple_tag[j].tag_string);
     }
 
+    talloc_free(parse_ctx.talloc_ctx);
     return 0;
 }
 
@@ -2050,7 +2049,6 @@ static int handle_block(demuxer_t *demuxer, uint8_t *block, uint64_t length,
                    "lacing. This is abnormal and not supported.\n");
             use_this_block = 0;
         }
-        sub_utf8 = 1; // XXX this variable should be eventually removed
     } else
         use_this_block = 0;
 

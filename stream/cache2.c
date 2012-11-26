@@ -406,18 +406,28 @@ static void cache_mainloop(cache_vars_t *s) {
     } while (cache_execute_control(s));
 }
 
+int stream_enable_cache_percent(stream_t *stream, int stream_cache_size,
+    float stream_cache_min_percent, float stream_cache_seek_min_percent)
+{
+    return stream_enable_cache(stream, stream_cache_size * 1024,
+        stream_cache_size * 1024 * (stream_cache_min_percent / 100.0),
+        stream_cache_size * 1024 * (stream_cache_seek_min_percent / 100.0));
+}
+
 /**
  * \return 1 on success, 0 if the function was interrupted and -1 on error
  */
-int stream_enable_cache(stream_t *stream,int size,int min,int seek_limit){
+int stream_enable_cache(stream_t *stream, int size, int min, int seek_limit)
+{
+    if (size < 0)
+        size = stream->cache_size * 1024;
+    if (!size)
+        return 1;
+    mp_tmsg(MSGT_NETWORK,MSGL_INFO,"Cache size set to %d KiB\n", size / 1024);
+
   int ss = stream->sector_size ? stream->sector_size : STREAM_BUFFER_SIZE;
   int res = -1;
   cache_vars_t* s;
-
-  if (stream->flags & STREAM_NON_CACHEABLE) {
-    mp_msg(MSGT_CACHE,MSGL_STATUS,"\rThis stream is non-cacheable\n");
-    return 1;
-  }
 
   s=cache_init(size,ss);
   if(s == NULL) return -1;
@@ -478,6 +488,7 @@ int stream_enable_cache(stream_t *stream,int size,int min,int seek_limit){
         }
     }
     mp_msg(MSGT_CACHE,MSGL_STATUS,"\n");
+    stream->cached = true;
     return 1; // parent exits
 
 err_out:
